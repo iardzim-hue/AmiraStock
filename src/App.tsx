@@ -212,11 +212,11 @@ export default function App() {
     const unsubProducts = onSnapshot(
       productsRef,
       (snapshot) => {
-        const items = snapshot.docs.map((d) => ({
+        const items = querySnapshot.docs.map(d => ({
           id: d.id,
-          ...d.data()
+          ...(d.data() as any)
         }));
-        items.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        items.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
         setProducts(items);
         setIsSyncing(false);
       },
