@@ -176,7 +176,7 @@ export default function App() {
 
   // --- FUNGSI NOTIFIKASI ---
   const showToast = (message: string, type: string = 'success') => {
-    setNotification({ message, type });
+    setNotification({ message, type } as any);
     setTimeout(() => {
       setNotification(null);
     }, 3500);
