@@ -1,0 +1,2 @@
+# AmiraStock
+Created with CodeSandbox
