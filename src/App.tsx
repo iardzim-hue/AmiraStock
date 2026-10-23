@@ -52,7 +52,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'kasir-pintar-pos-id';
+const appId = 'kasir-pintar-pos-id';
 
 
 // --- DATA CONTOH AWAL (Bila Database Kosong) ---
