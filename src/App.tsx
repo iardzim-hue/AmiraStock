@@ -175,7 +175,7 @@ export default function App() {
   });
 
   // --- FUNGSI NOTIFIKASI ---
-  const showToast = (message, type = 'success') => {
+  const showToast = (message: string, type: string = 'success') => {
     setNotification({ message, type });
     setTimeout(() => {
       setNotification(null);
