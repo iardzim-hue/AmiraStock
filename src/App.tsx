@@ -126,7 +126,7 @@ const SAMPLE_PRODUCTS = [
 ];
 
 // Format Rupiah
-const formatRp = (number) => {
+const formatRp = (number: number) => {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
