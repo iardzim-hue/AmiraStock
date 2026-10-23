@@ -234,7 +234,7 @@ export default function App() {
           ...d.data()
         }));
         trans.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
-        setTransactions(trans);
+        setTransactions(trans as any);
       },
       (error) => {
         console.error('Error listening transactions:', error);
