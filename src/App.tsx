@@ -212,7 +212,7 @@ export default function App() {
     const unsubProducts = onSnapshot(
       productsRef,
       (snapshot) => {
-        const items = querySnapshot.docs.map(d => ({
+        const items = snapshot.docs.map((d) => ({
           id: d.id,
           ...(d.data() as any)
         }));
