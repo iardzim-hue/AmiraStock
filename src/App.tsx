@@ -198,7 +198,7 @@ export default function App() {
     initAuth();
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+      const [user, setUser] = useState<any>(null);
     });
     return () => unsubscribe();
   }, []);
