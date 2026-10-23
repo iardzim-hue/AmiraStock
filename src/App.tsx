@@ -233,7 +233,7 @@ export default function App() {
           id: d.id,
           ...d.data()
         }));
-        trans.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        trans.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
         setTransactions(trans);
       },
       (error) => {
