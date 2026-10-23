@@ -216,8 +216,8 @@ export default function App() {
           id: d.id,
           ...d.data()
         }));
-        items.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        setProducts(items);
+        items.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+        setProducts(items as any);
         setIsSyncing(false);
       },
       (error) => {
@@ -233,7 +233,7 @@ export default function App() {
           id: d.id,
           ...d.data()
         }));
-        trans.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        trans.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
         setTransactions(trans as any);
       },
       (error) => {
