@@ -10,6 +10,7 @@ import {
   getFirestore, 
   collection, 
   doc, 
+  setDoc, 
   addDoc, 
   updateDoc, 
   deleteDoc, 
@@ -31,15 +32,20 @@ import {
   DollarSign, 
   Printer, 
   RefreshCw, 
+  ArrowUpRight, 
   Box, 
+  ChevronRight,
+  Percent,
+  Calculator,
   X,
   CreditCard,
   Banknote,
   QrCode,
+  TrendingUp,
   Store
 } from 'lucide-react';
 
-// --- KONFIGU// --- KONFIGURASI FIREBASE ---
+/ --- KONFIGURASI FIREBASE ---
 const firebaseConfig = {
   apiKey: "AIzaSyAqwKnrshTfZg4zvigi9w2S6n8hHrwOIM",
   authDomain: "kasirpro-amira.firebaseapp.com",
@@ -52,8 +58,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = 'kasir-pintar-pos-id';
-
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'kasir-pintar-pos-id';
 
 // --- DATA CONTOH AWAL (Bila Database Kosong) ---
 const SAMPLE_PRODUCTS = [
@@ -126,7 +131,7 @@ const SAMPLE_PRODUCTS = [
 ];
 
 // Format Rupiah
-const formatRp = (number: number) => {
+const formatRp = (number) => {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
@@ -155,11 +160,12 @@ export default function App() {
   const [paymentMethod, setPaymentMethod] = useState('Tunai'); // 'Tunai' | 'QRIS' | 'Transfer'
   const [cashReceived, setCashReceived] = useState('');
   const [showReceiptModal, setShowReceiptModal] = useState(null);
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
   // --- STATE MODALS INVENTARIS & HARGA ---
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [quickPriceModal, setQuickPriceModal] = useState(null);
+  const [quickPriceModal, setQuickPriceModal] = useState(null); // Untuk edit harga cepat
 
   // Form State untuk Tambah/Edit Barang
   const [formData, setFormData] = useState({
@@ -175,36 +181,39 @@ export default function App() {
   });
 
   // --- FUNGSI NOTIFIKASI ---
-  const showToast = (message: string, type: string = 'success') => {
-    setNotification({ message, type } as any);
+  const showToast = (message, type = 'success') => {
+    setNotification({ message, type });
     setTimeout(() => {
       setNotification(null);
-    }, 3500);
+    }, 3200);
   };
 
   // --- 1. AUTENTIKASI FIREBASE ---
   useEffect(() => {
     const initAuth = async () => {
       try {
-        if (typeof (window as any).__initial_auth_token !== 'undefined' && (window as any).__initial_auth_token) {
-          await signInWithCustomToken(auth, (window as any).__initial_auth_token);
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
         } else {
           await signInAnonymously(auth);
         }
       } catch (err) {
         console.error('Auth error:', err);
+        showToast('Gagal menghubungkan sesi multi-device', 'error');
       }
     };
     initAuth();
 
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      const [user, setUser] = useState<any>(null);
+      setUser(currentUser);
     });
     return () => unsubscribe();
   }, []);
 
   // --- 2. LISTEN DATA REALTIME DARI CLOUD (MULTI-DEVICE) ---
   useEffect(() => {
+    if (!user) return;
+
     setIsSyncing(true);
     const productsRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
     const transactionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
@@ -214,10 +223,11 @@ export default function App() {
       (snapshot) => {
         const items = snapshot.docs.map((d) => ({
           id: d.id,
-          ...(d.data() as any)
+          ...d.data()
         }));
-        items.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
-        setProducts(items as any);
+        // Sortir berdasarkan nama di memori (Rule 2)
+        items.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        setProducts(items);
         setIsSyncing(false);
       },
       (error) => {
@@ -233,8 +243,9 @@ export default function App() {
           id: d.id,
           ...d.data()
         }));
-        trans.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
-        setTransactions(trans as any);
+        // Sortir transaksi terbaru di memori
+        trans.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        setTransactions(trans);
       },
       (error) => {
         console.error('Error listening transactions:', error);
@@ -249,6 +260,7 @@ export default function App() {
 
   // --- MUAT CONTOH BARANG BILA KOSONG ---
   const seedSampleProducts = async () => {
+    if (!user) return;
     setIsSyncing(true);
     try {
       const productsRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
@@ -261,7 +273,7 @@ export default function App() {
       showToast('Data produk contoh berhasil dimuat ke Cloud!');
     } catch (err) {
       console.error(err);
-      showToast('Gagal memuat contoh barang. Pastikan Rules Firestore sudah diatur ke Test Mode.', 'error');
+      showToast('Gagal memuat contoh barang', 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -292,6 +304,7 @@ export default function App() {
       return;
     }
 
+    // Mode yang dipilih
     const modeToUse = forcedTier || defaultAddMode;
 
     setCart((prevCart) => {
@@ -311,12 +324,14 @@ export default function App() {
           return prevCart;
         }
 
+        // Tentukan apakah harga grosir atau ecer/satuan
         let newTier = existing.tier;
         if (forcedTier === 'wholesale' || forcedTier === 'wholesale_pack') {
           newTier = 'wholesale';
         } else if (forcedTier === 'retail') {
           newTier = 'retail';
         } else if (!existing.manualOverride) {
+          // Otomatis pindah ke grosir jika mencapai minimal grosir
           newTier = newQty >= minGrosir ? 'wholesale' : 'retail';
         }
 
@@ -335,6 +350,7 @@ export default function App() {
         };
         return updated;
       } else {
+        // Barang baru di keranjang
         let initialQty = 1;
         let initialTier = 'retail';
         let isManual = false;
@@ -352,6 +368,7 @@ export default function App() {
           initialTier = 'retail';
           isManual = true;
         } else {
+          // Auto
           initialQty = 1;
           initialTier = initialQty >= minGrosir ? 'wholesale' : 'retail';
         }
@@ -373,7 +390,7 @@ export default function App() {
             wholesalePrice: Number(product.wholesalePrice),
             wholesaleMinQty: minGrosir,
             maxStock: Number(product.stock),
-            tier: initialTier,
+            tier: initialTier, // 'retail' (Satuan/Ecer) | 'wholesale' (Grosir)
             manualOverride: isManual,
             activePrice,
             customPrice: null
@@ -477,6 +494,7 @@ export default function App() {
 
   // --- PROSES BAYAR (CHECKOUT) & UPDATE STOK CLOUD ---
   const handleCheckout = async () => {
+    if (!user) return;
     if (cart.length === 0) {
       showToast('Keranjang masih kosong!', 'error');
       return;
@@ -493,7 +511,7 @@ export default function App() {
       const txData = {
         invoiceNumber,
         timestamp: Date.now(),
-        cashierDevice: user ? user.uid.slice(0, 6).toUpperCase() : 'POS-01',
+        cashierDevice: user.uid.slice(0, 6).toUpperCase(),
         items: cart.map((i) => ({
           productId: i.productId,
           name: i.name,
@@ -512,9 +530,11 @@ export default function App() {
         change: paymentMethod === 'Tunai' ? Math.max(0, cashNum - cartSummary.grandTotal) : 0
       };
 
+      // 1. Simpan Transaksi ke Cloud
       const txRef = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
       await addDoc(txRef, txData);
 
+      // 2. Kurangi Stok Barang di Cloud
       for (const item of cart) {
         const prodDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', item.productId);
         const currentProd = products.find((p) => p.id === item.productId);
@@ -527,14 +547,16 @@ export default function App() {
         }
       }
 
+      // 3. Tampilkan Struk & Bersihkan Keranjang
       setShowReceiptModal(txData);
       setCart([]);
       setDiscountRp(0);
       setCashReceived('');
+      setMobileCartOpen(false);
       showToast('Transaksi berhasil disimpan & disinkronkan!');
     } catch (err) {
       console.error('Checkout error:', err);
-      showToast('Gagal menyimpan transaksi ke Cloud. Cek Rules Firestore.', 'error');
+      showToast('Terjadi kesalahan saat menyimpan transaksi', 'error');
     }
   };
 
@@ -574,6 +596,7 @@ export default function App() {
 
   const handleSaveProduct = async (e) => {
     e.preventDefault();
+    if (!user) return;
     if (!formData.name.trim()) {
       showToast('Nama barang wajib diisi!', 'error');
       return;
@@ -603,6 +626,7 @@ export default function App() {
         showToast(`Barang baru "${payload.name}" berhasil ditambahkan!`);
       }
 
+      // Sinkronkan harga keranjang jika barang sedang ada di keranjang
       if (editingProduct) {
         setCart((prev) =>
           prev.map((item) => {
@@ -626,14 +650,14 @@ export default function App() {
       setProductModalOpen(false);
     } catch (err) {
       console.error('Error saving product:', err);
-      showToast(`Gagal menyimpan ke Cloud: Pastikan Firestore Database sudah dibuat & Rules diizinkan`, 'error');
+      showToast('Gagal menyimpan barang ke Cloud', 'error');
     }
   };
 
-  // --- FITUR EDIT HARGA CEPAT ---
+  // --- FITUR EDIT HARGA CEPAT (DARI LAYAR KASIR ATAU INVENTARIS) ---
   const handleSaveQuickPrice = async (e) => {
     e.preventDefault();
-    if (!quickPriceModal) return;
+    if (!user || !quickPriceModal) return;
 
     const newRetail = Number(quickPriceModal.retailPrice) || 0;
     const newWholesale = Number(quickPriceModal.wholesalePrice) || 0;
@@ -648,6 +672,7 @@ export default function App() {
         updatedAt: Date.now()
       });
 
+      // Update di keranjang bila ada
       setCart((prev) =>
         prev.map((item) => {
           if (item.productId !== quickPriceModal.id) return item;
@@ -670,6 +695,7 @@ export default function App() {
   };
 
   const handleDeleteProduct = async (product) => {
+    if (!user) return;
     try {
       const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'products', product.id);
       await deleteDoc(docRef);
@@ -685,7 +711,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
       {/* TOAST NOTIFIKASI */}
       {notification && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-md transition-all bg-slate-900/95 border-slate-700">
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-md transition-all animate-bounce bg-slate-900/95 border-slate-700">
           {notification.type === 'error' ? (
             <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
           ) : (
@@ -698,6 +724,7 @@ export default function App() {
       {/* HEADER UTAMA & STATUS MULTI-DEVICE */}
       <header className="bg-slate-900/90 border-b border-slate-800 sticky top-0 z-30 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+          {/* Brand Logo */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
               <Store className="w-6 h-6 text-white" />
@@ -718,6 +745,7 @@ export default function App() {
             </div>
           </div>
 
+          {/* Navigasi Tab */}
           <nav className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
             <button
               onClick={() => setActiveTab('pos')}
@@ -757,6 +785,7 @@ export default function App() {
             </button>
           </nav>
 
+          {/* Aksi Cepat & Info Device */}
           <div className="flex items-center gap-2">
             <button
               onClick={openAddProductModal}
@@ -773,7 +802,7 @@ export default function App() {
               <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
               <span className="hidden md:inline">ID:</span>
               <span className="font-mono text-slate-200 text-[11px]">
-                {user ? user.uid.slice(0, 8) : 'Ready'}
+                {user ? user.uid.slice(0, 8) : 'Connecting...'}
               </span>
             </div>
           </div>
@@ -782,9 +811,12 @@ export default function App() {
 
       {/* KONTEN UTAMA */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-5">
+        {/* ================= TAB 1: KASIR (POS) ================= */}
         {activeTab === 'pos' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* KIRI: DAFTAR PRODUK (7 Kolom) */}
             <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
+              {/* Bar Pencarian & Mode Input Default */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3 shadow-lg">
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="relative flex-1">
@@ -814,6 +846,7 @@ export default function App() {
                   </button>
                 </div>
 
+                {/* Pilihan Mode Harga Klik Cepat */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
                   <span className="text-slate-400 flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-emerald-400" />
@@ -853,6 +886,7 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Filter Kategori */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
                   {categories.map((cat) => (
                     <button
@@ -870,6 +904,7 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Grid Barang */}
               {products.length === 0 && !isSyncing ? (
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center flex flex-col items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-400">
@@ -913,6 +948,7 @@ export default function App() {
                             : 'border-slate-800'
                         }`}
                       >
+                        {/* Bagian Atas Kartu: Kategori, SKU & Edit Harga Cepat */}
                         <div>
                           <div className="flex items-center justify-between gap-2 mb-1.5">
                             <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">
@@ -948,6 +984,7 @@ export default function App() {
                           </p>
                         </div>
 
+                        {/* Bagian Tengah: Info Harga Ecer/Satuan vs Grosir */}
                         <div className="grid grid-cols-2 gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
                           <div>
                             <span className="text-[10px] text-slate-400 block">
@@ -973,6 +1010,7 @@ export default function App() {
                           </div>
                         </div>
 
+                        {/* Bagian Bawah: 3 Tombol Aksi (Jual Ecer/Satuan, Ambil Paket Grosir, Harga Grosir) */}
                         <div className="grid grid-cols-2 gap-2 pt-1">
                           <button
                             disabled={isOutOfStock}
@@ -1000,7 +1038,9 @@ export default function App() {
               )}
             </div>
 
+            {/* KANAN: KERANJANG & PEMBAYARAN (5 Kolom) */}
             <div className="lg:col-span-5 xl:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl flex flex-col lg:sticky lg:top-20 overflow-hidden">
+              {/* Header Keranjang */}
               <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
@@ -1023,6 +1063,7 @@ export default function App() {
                 )}
               </div>
 
+              {/* Daftar Item di Keranjang */}
               <div className="p-4 flex-1 max-h-[360px] overflow-y-auto divide-y divide-slate-800/80 space-y-3">
                 {cart.length === 0 ? (
                   <div className="py-12 text-center flex flex-col items-center justify-center gap-2 text-slate-500">
@@ -1066,7 +1107,9 @@ export default function App() {
                           </button>
                         </div>
 
+                        {/* Kontrol Kuantitas & Saklar Eceran / Grosir */}
                         <div className="flex items-center justify-between gap-2 bg-slate-950 p-2 rounded-xl border border-slate-800/90">
+                          {/* Saklar Pilih Mode Harga Item Ini */}
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => switchCartItemTier(item.productId, 'retail')}
@@ -1075,6 +1118,7 @@ export default function App() {
                                   ? 'bg-sky-600 text-white'
                                   : 'text-slate-400 hover:text-slate-200'
                               }`}
+                              title="Gunakan Harga Eceran / Satuan"
                             >
                               Ecer
                             </button>
@@ -1085,17 +1129,20 @@ export default function App() {
                                   ? 'bg-amber-600 text-white'
                                   : 'text-slate-400 hover:text-slate-200'
                               }`}
+                              title="Aktifkan Harga Grosir"
                             >
                               Grosir
                             </button>
                             <button
                               onClick={() => switchCartItemTier(item.productId, 'wholesale', true)}
                               className="px-1.5 py-1 rounded-lg text-[10px] font-semibold bg-slate-800 hover:bg-slate-700 text-amber-300"
+                              title={`Set jumlah ke minimal grosir (${item.wholesaleMinQty} ${item.unit})`}
                             >
                               Min.{item.wholesaleMinQty}
                             </button>
                           </div>
 
+                          {/* Input Jumlah */}
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => updateCartQty(item.productId, item.qty - 1)}
@@ -1119,6 +1166,7 @@ export default function App() {
                             </button>
                           </div>
 
+                          {/* Subtotal Baris */}
                           <div className="text-right min-w-[75px]">
                             <span className="text-xs font-bold text-emerald-400 block">
                               {formatRp(item.activePrice * item.qty)}
@@ -1131,6 +1179,7 @@ export default function App() {
                 )}
               </div>
 
+              {/* Ringkasan & Pembayaran */}
               <div className="p-4 bg-slate-950/90 border-t border-slate-800 space-y-3">
                 {cartSummary.wholesaleSavings > 0 && (
                   <div className="flex items-center justify-between text-xs px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300">
@@ -1158,6 +1207,7 @@ export default function App() {
                   </span>
                 </div>
 
+                {/* Metode Pembayaran */}
                 <div className="grid grid-cols-3 gap-2 pt-1">
                   {[
                     { id: 'Tunai', icon: Banknote },
@@ -1183,6 +1233,7 @@ export default function App() {
                   })}
                 </div>
 
+                {/* Input Uang Diterima (Khusus Tunai) */}
                 {paymentMethod === 'Tunai' && (
                   <div className="space-y-2 pt-1">
                     <div className="flex items-center justify-between gap-2">
@@ -1195,6 +1246,7 @@ export default function App() {
                         className="flex-1 text-right bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-1.5 text-sm font-bold text-white focus:outline-none"
                       />
                     </div>
+                    {/* Pecahan Cepat */}
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         type="button"
@@ -1244,6 +1296,7 @@ export default function App() {
           </div>
         )}
 
+        {/* ================= TAB 2: INVENTARIS, TAMBAH BARANG & EDIT HARGA ================= */}
         {activeTab === 'inventory' && (
           <div className="space-y-5">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1256,13 +1309,15 @@ export default function App() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2.5">
-                <button
-                  onClick={seedSampleProducts}
-                  className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2.5 rounded-xl text-xs font-semibold border border-slate-700"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Muat Barang Contoh
-                </button>
+                {products.length === 0 && (
+                  <button
+                    onClick={seedSampleProducts}
+                    className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2.5 rounded-xl text-xs font-semibold border border-slate-700"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Muat Barang Contoh
+                  </button>
+                )}
                 <button
                   onClick={openAddProductModal}
                   className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-emerald-600/20"
@@ -1273,6 +1328,7 @@ export default function App() {
               </div>
             </div>
 
+            {/* Tabel Daftar Barang */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
@@ -1367,8 +1423,10 @@ export default function App() {
           </div>
         )}
 
+        {/* ================= TAB 3: RIWAYAT TRANSAKSI MULTI-DEVICE ================= */}
         {activeTab === 'transactions' && (
           <div className="space-y-5">
+            {/* Ringkasan Omzet */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
                 <span className="text-xs text-slate-400">Total Transaksi Tercatat</span>
@@ -1393,6 +1451,7 @@ export default function App() {
               </div>
             </div>
 
+            {/* Daftar Transaksi */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
               <div className="p-4 border-b border-slate-800">
                 <h3 className="font-bold text-sm text-white">Riwayat Penjualan Terbaru</h3>
@@ -1458,11 +1517,11 @@ export default function App() {
         )}
       </main>
 
-      {/* ================= MODAL 1: TAMBAH / EDIT BARANG LENGKAP (STICKY HEADER & FOOTER) ================= */}
+      {/* ================= MODAL 1: TAMBAH / EDIT BARANG LENGKAP ================= */}
       {productModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-5 sm:p-6 my-auto shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3 sticky top-0 bg-slate-900 z-10">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="font-bold text-base text-white">
                 {editingProduct ? 'Edit Data & Harga Barang' : 'Tambah Barang Baru'}
               </h3>
@@ -1478,15 +1537,15 @@ export default function App() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
                   <label className="block text-slate-300 font-semibold mb-1">
-                    Nama Barang (Wajib Diisi) *
+                    Nama Barang *
                   </label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Ketik nama barang di sini..."
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500"
+                    placeholder="Contoh: Beras Ramos 5kg"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
                 <div>
@@ -1497,7 +1556,7 @@ export default function App() {
                     type="text"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500"
                   />
                 </div>
               </div>
@@ -1511,7 +1570,7 @@ export default function App() {
                     type="text"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    placeholder="Sembako"
+                    placeholder="Sembako / Minuman"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                   />
                 </div>
@@ -1535,12 +1594,13 @@ export default function App() {
                     type="text"
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    placeholder="Pcs / Bungkus"
+                    placeholder="Pcs / Bungkus / Kg"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
                   />
                 </div>
               </div>
 
+              {/* Pengaturan Harga Eceran & Grosir */}
               <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
                 <div className="font-bold text-slate-200 flex items-center gap-1.5">
                   <Tag className="w-4 h-4 text-emerald-400" />
@@ -1613,11 +1673,11 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900 py-2">
+              <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setProductModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold"
                 >
                   Batal
                 </button>
