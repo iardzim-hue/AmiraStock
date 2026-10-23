@@ -217,7 +217,7 @@ export default function App() {
           ...(d.data() as any)
         }));
         items.sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
-        setProducts(items);
+        setProducts(items as any);
         setIsSyncing(false);
       },
       (error) => {
