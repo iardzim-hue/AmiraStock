@@ -1442,8 +1442,8 @@ export default function App() {
           {/* Baris Atas: Brand Toko + Tombol Aksi (Atur Nota, Tambah, ID) */}
           <div className="flex items-center justify-between gap-2 w-full">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
-                <Store className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden bg-slate-950 border border-amber-400/30 flex items-center justify-center shadow-lg shadow-amber-500/10 shrink-0">
+                <img src="/amira-logo.svg" alt="Amira Kasir Pro" className="w-full h-full object-cover" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
