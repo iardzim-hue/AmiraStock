@@ -198,6 +198,9 @@ export default function App() {
   const [invSearchQuery, setInvSearchQuery] = useState<string>('');
   const [invCategory, setInvCategory] = useState<string>('Semua');
   const [invStockFilter, setInvStockFilter] = useState<string>('all'); // 'all' | 'low' | 'out'
+  const [showBulkRestock, setShowBulkRestock] = useState<boolean>(false);
+  const [restockRows, setRestockRows] = useState<any[]>([{ productId: '', qty: '1', costPrice: '' }]);
+  const [isSavingRestock, setIsSavingRestock] = useState<boolean>(false);
 
   // --- STATE FILTER & SORTIR RIWAYAT TRANSAKSI ---
   const [txSearchQuery, setTxSearchQuery] = useState<string>('');
@@ -1036,6 +1039,7 @@ export default function App() {
     setEditingTx({
       ...tx,
       customerName: tx.customerName || '',
+      editDate: new Date(Number(tx.timestamp) || Date.now()).toISOString().slice(0, 16),
       items: clonedItems,
       discount: Number(tx.discount) || 0,
       cashReceived: Number(tx.cashReceived) || 0,
@@ -1069,6 +1073,55 @@ export default function App() {
     setEditingTx({ ...editingTx, items: updatedItems });
   };
 
+  const addRestockRow = () => setRestockRows((rows) => [...rows, { productId: '', qty: '1', costPrice: '' }]);
+
+  const updateRestockRow = (index: number, field: string, value: string) => {
+    setRestockRows((rows) => rows.map((row, i) => {
+      if (i !== index) return row;
+      const next = { ...row, [field]: value };
+      if (field === 'productId') {
+        const product = products.find((p: any) => p.id === value);
+        next.costPrice = product ? String(Number(product.costPrice) || 0) : '';
+      }
+      return next;
+    }));
+  };
+
+  const handleBulkRestock = async (e: any) => {
+    e.preventDefault();
+    const validRows = restockRows.filter((row) => row.productId && Number(row.qty) > 0);
+    if (!validRows.length) {
+      showToast('Pilih minimal satu barang dan isi jumlah restok.', 'error');
+      return;
+    }
+    const duplicateIds = validRows.map((row) => row.productId).filter((id, index, ids) => ids.indexOf(id) !== index);
+    if (duplicateIds.length) {
+      showToast('Barang yang sama dipilih lebih dari sekali. Gabungkan jumlahnya dalam satu baris.', 'error');
+      return;
+    }
+    setIsSavingRestock(true);
+    try {
+      for (const row of validRows) {
+        const product = products.find((p: any) => p.id === row.productId);
+        if (!product) continue;
+        const payload: any = {
+          stock: (Number(product.stock) || 0) + Math.floor(Number(row.qty)),
+          updatedAt: Date.now()
+        };
+        if (row.costPrice !== '' && Number(row.costPrice) >= 0) payload.costPrice = Number(row.costPrice);
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', row.productId), payload);
+      }
+      setRestockRows([{ productId: '', qty: '1', costPrice: '' }]);
+      setShowBulkRestock(false);
+      showToast(`Restok berhasil disimpan untuk ${validRows.length} barang.`);
+    } catch (err) {
+      console.error('Bulk restock error:', err);
+      showToast('Restok massal gagal disimpan. Periksa koneksi dan coba lagi.', 'error');
+    } finally {
+      setIsSavingRestock(false);
+    }
+  };
+
   const handleSaveEditedTx = async (e: any) => {
     e.preventDefault();
     if (!editingTx) return;
@@ -1094,6 +1147,7 @@ export default function App() {
       const txDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'transactions', editingTx.id);
       const updatedPayload = {
         customerName: (editingTx.customerName || '').trim(),
+        timestamp: editingTx.editDate ? new Date(editingTx.editDate).getTime() : Number(editingTx.timestamp) || Date.now(),
         items: editingTx.items,
         subtotal: newSubtotal,
         discount: newDiscount,
@@ -2150,6 +2204,13 @@ export default function App() {
                     Muat Barang Contoh
                   </button>
                   <button
+                    onClick={() => setShowBulkRestock(true)}
+                    className="flex items-center gap-2 bg-sky-600 hover:bg-sky-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold"
+                  >
+                    <Package className="w-4 h-4" />
+                    Restok Massal
+                  </button>
+                  <button
                     onClick={openAddProductModal}
                     className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg shadow-emerald-600/20"
                   >
@@ -2552,6 +2613,51 @@ export default function App() {
         )}
       </main>
 
+      {showBulkRestock && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-4 sm:p-5 shadow-2xl space-y-4 my-auto max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="font-bold text-white text-base flex items-center gap-2"><Package className="w-5 h-5 text-sky-400" /> Restok Massal</h3>
+                <p className="text-xs text-slate-400 mt-1">Pilih beberapa barang, masukkan jumlah tambahan stok dan harga modal terbaru bila berubah.</p>
+              </div>
+              <button type="button" onClick={() => setShowBulkRestock(false)} className="text-slate-400 hover:text-white p-1"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleBulkRestock} className="space-y-3">
+              {restockRows.map((row, index) => (
+                <div key={index} className="grid grid-cols-1 sm:grid-cols-[minmax(0,2fr)_minmax(90px,0.7fr)_minmax(130px,1fr)_auto] gap-2 p-3 rounded-xl bg-slate-950 border border-slate-800">
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-1">Barang</label>
+                    <select value={row.productId} onChange={(e) => updateRestockRow(index, 'productId', e.target.value)} required className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-white">
+                      <option value="">Pilih barang...</option>
+                      {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} — stok {Number(p.stock) || 0}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-1">Tambah Stok</label>
+                    <input type="number" min="1" step="1" value={row.qty} onChange={(e) => updateRestockRow(index, 'qty', e.target.value)} required className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-1">Harga Modal Baru (Rp)</label>
+                    <input type="number" min="0" step="1" value={row.costPrice} onChange={(e) => updateRestockRow(index, 'costPrice', e.target.value)} placeholder="Tetap harga lama" className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-white" />
+                  </div>
+                  <div className="flex items-end">
+                    <button type="button" disabled={restockRows.length === 1} onClick={() => setRestockRows((rows) => rows.filter((_: any, i: number) => i !== index))} className="w-full sm:w-auto px-3 py-2 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20 disabled:opacity-30" title="Hapus baris"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </div>
+              ))}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <button type="button" onClick={addRestockRow} className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white flex items-center gap-1.5"><Plus className="w-4 h-4" /> Tambah Barang</button>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setShowBulkRestock(false)} className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold">Batal</button>
+                  <button type="submit" disabled={isSavingRestock} className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold disabled:opacity-50">{isSavingRestock ? 'Menyimpan...' : 'Simpan Restok'}</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ================= MODAL 5: EDIT RIWAYAT NOTA (HARGA, JUMLAH, DISKON, HAPUS) ================= */}
       {editingTx && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -2575,6 +2681,17 @@ export default function App() {
             </div>
 
             <form onSubmit={handleSaveEditedTx} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-400 mb-1">Tanggal & Waktu Transaksi</label>
+                <input
+                  type="datetime-local"
+                  value={editingTx.editDate || ''}
+                  onChange={(e) => setEditingTx({ ...editingTx, editDate: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
+                  required
+                />
+                <p className="text-[10px] text-amber-300 mt-1">Mengubah tanggal akan memperbarui tanggal transaksi di riwayat dan nota.</p>
+              </div>
               <div>
                 <label className="block text-slate-400 mb-1">Nama Pelanggan (Opsional)</label>
                 <input
