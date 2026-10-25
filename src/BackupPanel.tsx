@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { collection, doc, getDocs, setDoc, writeBatch, Firestore } from 'firebase/firestore';
+import { doc, setDoc, writeBatch, Firestore } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { Download, Upload, ShieldCheck, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 
@@ -29,11 +29,14 @@ export default function BackupPanel({
     try {
       const workbook = XLSX.utils.book_new();
       const productRows = products.map(({ id, ...data }) => ({ id, ...jsonSafe(data) }));
-      const transactionRows = transactions.map(({ id, ...data }) => ({
-        id,
-        ...jsonSafe(data),
-        items_json: JSON.stringify(data.items ?? [])
-      }));
+      const transactionRows = transactions.map(({ id, ...data }) => {
+        const { items, ...transactionFields } = data;
+        return {
+          id,
+          ...jsonSafe(transactionFields),
+          items_json: JSON.stringify(items ?? [])
+        };
+      });
       const transactionDetails = transactions.flatMap((transaction: any) =>
         (Array.isArray(transaction.items) ? transaction.items : []).map((item: any, index: number) => ({
           transactionId: transaction.id,
