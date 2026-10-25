@@ -177,6 +177,7 @@ export default function App() {
     name: 'KASIRPINTAR PRO',
     address: 'Sistem Kasir Grosir & Eceran',
     phone: '0812-3456-7890',
+    cashierName: '',
     footerNote: 'Terima kasih atas kunjungan Anda! Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.'
   });
 
@@ -397,7 +398,7 @@ export default function App() {
     // INFO TRANSAKSI
     out += formatLeftRight('No Nota:', tx.invoiceNumber) + '\n';
     out += formatLeftRight('Tanggal:', new Date(tx.timestamp).toLocaleString('id-ID')) + '\n';
-    out += formatLeftRight('Kasir:', `#${tx.cashierDevice || 'POS'}`) + '\n';
+    out += formatLeftRight('Kasir:', `${tx.cashierName || storeInfo.cashierName || 'Kasir'}${tx.cashierDevice ? ` (#${tx.cashierDevice})` : ''}`) + '\n';
     if (tx.customerName) {
       out += formatLeftRight('Pelanggan:', tx.customerName) + '\n';
     }
@@ -601,7 +602,7 @@ export default function App() {
         <div>
           <div>No: <b>${tx.invoiceNumber}</b></div>
           <div>Tgl: ${new Date(tx.timestamp).toLocaleString('id-ID')}</div>
-          <div>Kasir: #${tx.cashierDevice || 'POS'}</div>
+          <div>Kasir: <b>${tx.cashierName || storeInfo.cashierName || 'Kasir'}</b>${tx.cashierDevice ? ` (#${tx.cashierDevice})` : ''}</div>
           ${tx.customerName ? `<div>Pelanggan: <b>${tx.customerName}</b></div>` : ''}
         </div>
         <div class="divider"></div>
@@ -980,6 +981,7 @@ export default function App() {
         invoiceNumber,
         timestamp: Date.now(),
         cashierDevice: user ? user.uid.slice(0, 6).toUpperCase() : 'POS-01',
+        cashierName: (storeInfo.cashierName || '').trim(),
         customerName: customerName.trim() || '',
         items: cart.map((i) => ({
           productId: i.productId,
@@ -2473,7 +2475,7 @@ export default function App() {
                             </span>
                           )}
                           <span className="text-[11px] text-slate-500">
-                            #{tx.cashierDevice || 'POS'}
+                            {tx.cashierName || 'Kasir'}{tx.cashierDevice ? ` · #${tx.cashierDevice}` : ''}
                           </span>
                         </div>
                         <p className="text-xs text-slate-300 break-words">
@@ -3254,6 +3256,20 @@ export default function App() {
                   placeholder="Contoh: TOKO SEMBAKO AMIRA"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
                 />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Nama Kasir
+                </label>
+                <input
+                  type="text"
+                  value={storeInfo.cashierName || ''}
+                  onChange={(e) => setStoreInfo({ ...storeInfo, cashierName: e.target.value })}
+                  placeholder="Contoh: Andi"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                />
+                <p className="text-slate-500 mt-1">Nama ini disimpan pada transaksi baru dan ditampilkan di nota.</p>
               </div>
 
               <div>
