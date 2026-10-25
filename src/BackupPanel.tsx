@@ -13,8 +13,6 @@ type BackupPanelProps = {
   onNotice: (message: string) => void;
 };
 
-const path = (appId: string, name: string) => ['artifacts', appId, 'public', 'data', name];
-
 function jsonSafe(value: any) {
   return JSON.parse(JSON.stringify(value ?? null));
 }
@@ -113,11 +111,11 @@ export default function BackupPanel({
 
       const operations: Array<{ ref: any; data: any }> = [
         ...parsedProducts.map((row) => ({
-          ref: doc(db, ...path(appId, 'products'), row.id),
+          ref: doc(db, 'artifacts', appId, 'public', 'data', 'products', row.id),
           data: row.data
         })),
         ...parsedTransactions.map((row) => ({
-          ref: doc(db, ...path(appId, 'transactions'), row.id),
+          ref: doc(db, 'artifacts', appId, 'public', 'data', 'transactions', row.id),
           data: row.data
         }))
       ];
@@ -129,7 +127,7 @@ export default function BackupPanel({
 
       if (settings) {
         const { documentId, ...settingsData } = settings;
-        const configRef = doc(db, ...path(appId, 'settings'), 'receipt_config');
+        const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'receipt_config');
         await setDoc(configRef, settingsData, { merge: true });
       }
       onNotice('Restore selesai. Data dengan ID sama diperbarui; data lain tetap dipertahankan.');
