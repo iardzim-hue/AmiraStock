@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-labelledby="title">
+<title id="title">Amira Kasir Pro</title>
+<defs>
+  <linearGradient id="gold" x1="0" y1="0" x2="0.9" y2="1"><stop offset="0" stop-color="#fff0a1"/><stop offset=".48" stop-color="#ffd04b"/><stop offset="1" stop-color="#d99113"/></linearGradient>
+  <linearGradient id="swoosh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffdf70"/><stop offset="1" stop-color="#e7a21b"/></linearGradient>
+  <filter id="soft"><feGaussianBlur stdDeviation="0.45"/></filter>
+</defs>
+<rect width="400" height="400" rx="16" fill="#080808"/>
+<g fill="url(#gold)">
+  <path d="M82 183 L188 44 Q199 31 207 45 L282 184 Q287 194 276 194 L248 194 Q240 194 236 185 L198 111 L139 187 Q133 194 123 194 L91 194 Q76 194 82 183Z"/>
+  <path d="M219 108 Q239 90 266 91 Q289 92 298 111 L309 183 Q311 192 302 192 L281 192 Q274 192 272 184 L265 150 Q249 149 234 158 L218 136Z" opacity=".98"/>
+  <path d="M264 105 Q292 89 306 106 Q321 126 290 157 Q247 201 176 222 Q121 238 104 211 Q94 194 115 176 Q105 197 123 204 Q144 214 184 195 Q237 173 274 137 Q291 120 282 110 Q276 102 264 105Z" fill="url(#swoosh)"/>
+</g>
+<g fill="#17130a" stroke="#17130a" stroke-linecap="round" stroke-width="4">
+  <path d="M251 146 L276 143" fill="none"/><path d="M254 158 L280 155" fill="none"/><path d="M257 170 L283 167" fill="none"/>
+</g>
+<g fill="url(#gold)" font-family="Arial, Helvetica, sans-serif" text-anchor="middle" font-weight="700">
+  <text x="200" y="269" font-size="63" letter-spacing="-2.5">Amira</text>
+  <text x="200" y="310" font-size="38" letter-spacing="-.8">Kasir Pro</text>
+</g>
+</svg>
