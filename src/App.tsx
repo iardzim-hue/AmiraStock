@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import BackupPanel from './BackupPanel';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
@@ -1436,7 +1437,7 @@ export default function App() {
           </div>
 
           {/* Baris Navigasi Tab: Full-Width & Proporsional di HP */}
-          <nav className="grid grid-cols-3 bg-slate-950 p-1 rounded-xl border border-slate-800 w-full">
+          <nav className="grid grid-cols-4 bg-slate-950 p-1 rounded-xl border border-slate-800 w-full">
             <button
               onClick={() => setActiveTab('pos')}
               className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
@@ -1469,6 +1470,17 @@ export default function App() {
             >
               <History className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               <span className="truncate">Riwayat</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('backup')}
+              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                activeTab === 'backup'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="truncate">Backup</span>
             </button>
           </nav>
         </div>
@@ -2522,6 +2534,18 @@ export default function App() {
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'backup' && (
+          <BackupPanel
+            db={db}
+            appId={appId}
+            products={products}
+            transactions={transactions}
+            storeInfo={storeInfo}
+            paperSize={paperSize}
+            onNotice={showToast}
+          />
         )}
       </main>
 
