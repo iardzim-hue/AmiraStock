@@ -3246,6 +3246,10 @@ export default function App() {
                   {showReceiptModal.invoiceNumber} •{' '}
                   {new Date(showReceiptModal.timestamp).toLocaleString('id-ID')}
                 </p>
+                <p className="text-[11px] text-slate-600 mt-0.5">
+                  Kasir: <span className="font-bold">{showReceiptModal.cashierName || storeInfo.cashierName || 'Kasir'}</span>
+                  {showReceiptModal.cashierDevice ? ` (#${showReceiptModal.cashierDevice})` : ''}
+                </p>
                 {showReceiptModal.customerName && (
                   <p className="text-[11px] font-bold text-slate-700 mt-0.5">
                     Pelanggan: {showReceiptModal.customerName}
